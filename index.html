@@ -1,94 +1,89 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="nl">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Barcode Vergelijker</title>
-  <style>
-    body {
-      font-family: Arial, sans-serif;
-      background-color: #f4f4f4;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      padding: 50px 20px;
-    }
-
-    h1 {
-      margin-bottom: 30px;
-    }
-
-    .input-container {
-      display: flex;
-      flex-direction: column;
-      gap: 15px;
-      margin-bottom: 30px;
-      width: 100%;
-      max-width: 400px;
-    }
-
-    input[type="text"] {
-      font-size: 1.2em;
-      padding: 12px;
-      border: 2px solid #ccc;
-      border-radius: 8px;
-      width: 100%;
-    }
-
-    .lampje {
-      width: 60px;
-      height: 60px;
-      border-radius: 50%;
-      background-color: gray;
-      border: 2px solid #333;
-      transition: background-color 0.3s ease;
-    }
-  </style>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Barcode Match</title>
+  <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
+  <main class="container">
+    <header class="header">
+      <h1>Barcode Match</h1>
+      <p class="hint">Scan eerst je gebruikersbarcode, daarna barcode 1 en 2.</p>
+    </header>
 
-  <h1>Barcode Vergelijker</h1>
+    <section class="card">
+      <div class="grid">
+        <label class="field">
+          <span>Gebruiker (B4)</span>
+          <input id="userInput" type="text" inputmode="text" autocomplete="off" />
+          <small class="subhint">Enkel letters vóór eerste spatie worden bewaard.</small>
+        </label>
 
-  <div class="input-container">
-    <input id="barcode1" type="text" placeholder="Scan eerste barcode" autocomplete="off" />
-    <input id="barcode2" type="text" placeholder="Scan tweede barcode" autocomplete="off" />
-  </div>
+        <label class="field">
+          <span>Barcode 1 (A2)</span>
+          <input id="code1" type="text" inputmode="text" autocomplete="off" />
+        </label>
 
-  <div id="lampje" class="lampje"></div>
+        <label class="field">
+          <span>Barcode 2 (B2)</span>
+          <input id="code2" type="text" inputmode="text" autocomplete="off" />
+        </label>
 
-  <script>
-    window.addEventListener('DOMContentLoaded', () => {
-      const barcode1 = document.getElementById('barcode1');
-      const barcode2 = document.getElementById('barcode2');
-      const lampje = document.getElementById('lampje');
+        <div class="field">
+          <span>Status (C2)</span>
+          <div id="statusCell" class="status status-incomplete">incomplete</div>
+        </div>
+      </div>
 
-      function vergelijkBarcodes() {
-        const b1 = barcode1.value.trim().substring(0, 9);
-        const b2 = barcode2.value.trim().substring(0, 9);
+      <div class="actions">
+        <button id="clearBtn" type="button">Leegmaken</button>
+        <button id="exportBtn" type="button">Export CSV</button>
+      </div>
+    </section>
 
-        console.log("Barcode 1:", b1);
-        console.log("Barcode 2:", b2);
+    <section class="card">
+      <div class="card-head">
+        <h2>Substitutie</h2>
+        <p class="hint">Elke lijn: <code>EXPECTED,SUBSTITUTE</code> (eerste 9 tekens tellen).</p>
+      </div>
+      <textarea id="substitutionInput" rows="6" spellcheck="false"></textarea>
+      <div class="actions">
+        <button id="saveSubBtn" type="button">Substitutie opslaan</button>
+        <button id="resetSubBtn" type="button">Reset voorbeeld</button>
+      </div>
+    </section>
 
-        if (b1.length < 9 || b2.length < 9) {
-          lampje.style.backgroundColor = 'gray';
-          return;
-        }
+    <section class="card">
+      <div class="card-head">
+        <h2>Archief</h2>
+        <p class="hint">Wordt lokaal opgeslagen in je browser (localStorage).</p>
+      </div>
 
-        if (b1 === b2) {
-          lampje.style.backgroundColor = 'green';
-        } else {
-          lampje.style.backgroundColor = 'red';
-        }
-      }
+      <div class="table-wrap">
+        <table id="archiveTable">
+          <thead>
+            <tr>
+              <th>Datum/tijd</th>
+              <th>Gebruiker</th>
+              <th>Barcode 1 (volledig)</th>
+              <th>Barcode 2 (volledig)</th>
+              <th>Eerste 9 (A2)</th>
+              <th>Eerste 9 (B2)</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
 
-      // Ondersteuning voor barcode-scanners + typen + enter
-      ['input', 'change', 'keyup'].forEach(evt => {
-        barcode1.addEventListener(evt, vergelijkBarcodes);
-        barcode2.addEventListener(evt, vergelijkBarcodes);
-      });
-    });
-  </script>
+      <div class="actions">
+        <button id="clearArchiveBtn" type="button" class="danger">Archief wissen</button>
+      </div>
+    </section>
+  </main>
 
+  <script src="app.js"></script>
 </body>
 </html>
-
