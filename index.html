@@ -3,66 +3,158 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Barcode Match</title>
-  <link rel="stylesheet" href="styles.css" />
+  <title>Barcode Match (Excel-gedrag)</title>
+  <style>
+    :root{
+      --bg:#0b0f14; --card:#121924; --text:#e9eef6; --muted:#a9b3c3; --border:rgba(255,255,255,.08);
+      --gray:#c0c0c0; --green:#92d050; --red:#ff0000;
+    }
+    *{ box-sizing:border-box; }
+    body{
+      margin:0; font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;
+      background: radial-gradient(1200px 600px at 10% 0%, rgba(120,140,200,.18), transparent),
+                  radial-gradient(1000px 500px at 90% 10%, rgba(140,200,160,.12), transparent),
+                  var(--bg);
+      color:var(--text);
+    }
+    .container{ max-width:1100px; margin:24px auto; padding:0 16px 48px; }
+    h1{ margin:0 0 6px; font-size:28px; }
+    .hint{ margin:0; color:var(--muted); }
+    .card{
+      margin-top:16px; background:rgba(18,25,36,.92);
+      border:1px solid var(--border); border-radius:16px; padding:16px; backdrop-filter:blur(10px);
+    }
+    .grid{
+      display:grid; grid-template-columns:repeat(2, minmax(240px, 1fr)); gap:12px;
+    }
+    label span{ display:block; margin-bottom:6px; color:var(--muted); font-size:12px; }
+    input, textarea{
+      width:100%; padding:12px 12px; border-radius:12px; border:1px solid var(--border);
+      background:rgba(0,0,0,.25); color:var(--text); outline:none; font-size:14px;
+    }
+    input:focus, textarea:focus{ border-color:rgba(120,160,255,.35); }
+    small{ display:block; color:var(--muted); margin-top:6px; font-size:12px; }
+    .status{
+      height:44px; border-radius:12px; border:1px solid rgba(0,0,0,.3);
+      display:grid; place-items:center; font-weight:800; font-size:16px; color:#000; user-select:none;
+    }
+    .status-incomplete{ background:var(--gray); }
+    .status-match{ background:var(--green); }
+    .status-nomatch{ background:var(--red); color:#fff; }
+    .actions{ display:flex; gap:10px; margin-top:12px; flex-wrap:wrap; }
+    button{
+      padding:10px 12px; border-radius:12px; border:1px solid var(--border);
+      background:rgba(255,255,255,.06); color:var(--text); cursor:pointer;
+    }
+    button:hover{ background:rgba(255,255,255,.10); }
+    button.danger{ border-color:rgba(255,60,60,.35); }
+    .row{ display:flex; gap:12px; align-items:center; flex-wrap:wrap; }
+    .pill{
+      padding:6px 10px; border-radius:999px; border:1px solid var(--border);
+      background:rgba(0,0,0,.22); color:var(--muted); font-size:12px;
+    }
+    .pill strong{ color:var(--text); }
+    .table-wrap{
+      overflow:auto; border-radius:12px; border:1px solid var(--border); margin-top:10px;
+    }
+    table{ width:100%; border-collapse:collapse; min-width:900px; }
+    thead th{
+      text-align:left; font-size:12px; color:var(--muted); padding:10px;
+      border-bottom:1px solid var(--border); background:rgba(0,0,0,.22);
+    }
+    tbody td{ padding:10px; border-bottom:1px solid rgba(255,255,255,.06); font-size:13px; }
+    code{ color:#d7e3ff; }
+    .disabled-overlay{
+      position:fixed; inset:0; background:rgba(0,0,0,.35);
+      display:none; align-items:center; justify-content:center; z-index:9999;
+    }
+    .disabled-overlay .box{
+      width:min(520px, calc(100% - 32px));
+      background:rgba(18,25,36,.98);
+      border:1px solid var(--border);
+      border-radius:18px;
+      padding:18px;
+      box-shadow:0 10px 40px rgba(0,0,0,.45);
+    }
+    .disabled-overlay h3{ margin:0 0 8px; }
+    .disabled-overlay p{ margin:0; color:var(--muted); }
+  </style>
 </head>
 <body>
+  <div class="disabled-overlay" id="overlay">
+    <div class="box">
+      <h3>Match — even wachten…</h3>
+      <p>Velden zijn tijdelijk geblokkeerd, zoals in Excel. Nog <strong id="countdown">5</strong> s.</p>
+    </div>
+  </div>
+
   <main class="container">
-    <header class="header">
+    <header>
       <h1>Barcode Match</h1>
-      <p class="hint">Scan eerst je gebruikersbarcode, daarna barcode 1 en 2.</p>
+      <p class="hint">Excel-gedrag: scan gebruiker → scan A2 → scan B2 → match/no match → bij match 5s blokkering + reset.</p>
     </header>
 
     <section class="card">
       <div class="grid">
-        <label class="field">
+        <label>
           <span>Gebruiker (B4)</span>
-          <input id="userInput" type="text" inputmode="text" autocomplete="off" />
-          <small class="subhint">Enkel letters vóór eerste spatie worden bewaard.</small>
+          <input id="userInput" type="text" autocomplete="off" />
+          <small>Enkel letters vóór eerste spatie worden bewaard (uppercase).</small>
         </label>
 
-        <label class="field">
-          <span>Barcode 1 (A2)</span>
-          <input id="code1" type="text" inputmode="text" autocomplete="off" />
-        </label>
-
-        <label class="field">
-          <span>Barcode 2 (B2)</span>
-          <input id="code2" type="text" inputmode="text" autocomplete="off" />
-        </label>
-
-        <div class="field">
-          <span>Status (C2)</span>
+        <div>
+          <span style="display:block;margin-bottom:6px;color:var(--muted);font-size:12px;">Status (C2)</span>
           <div id="statusCell" class="status status-incomplete">incomplete</div>
+          <small class="row">
+            <span class="pill">Vergelijk: <strong>eerste 9</strong> tekens</span>
+            <span class="pill">Match delay: <strong>5s</strong></span>
+          </small>
+        </div>
+
+        <label>
+          <span>Barcode 1 (A2)</span>
+          <input id="code1" type="text" autocomplete="off" />
+        </label>
+
+        <label>
+          <span>Barcode 2 (B2)</span>
+          <input id="code2" type="text" autocomplete="off" />
+        </label>
+      </div>
+
+      <div class="actions">
+        <button id="clearBtn" type="button">A2/B2 leegmaken</button>
+        <button id="exportBtn" type="button">Export Archief CSV</button>
+      </div>
+    </section>
+
+    <section class="card">
+      <div class="row" style="justify-content:space-between;">
+        <div>
+          <h2 style="margin:0;font-size:18px;">Substitutie</h2>
+          <p class="hint" style="margin-top:6px;">Elke lijn: <code>EXPECTED,SUBSTITUTE</code> (eerste 9 tekens tellen). Volgorde maakt niet uit.</p>
+        </div>
+        <div class="actions" style="margin-top:0;">
+          <button id="saveSubBtn" type="button">Opslaan</button>
+          <button id="resetSubBtn" type="button">Reset voorbeeld</button>
+        </div>
+      </div>
+      <textarea id="substitutionInput" rows="6" spellcheck="false"></textarea>
+    </section>
+
+    <section class="card">
+      <div class="row" style="justify-content:space-between;">
+        <div>
+          <h2 style="margin:0;font-size:18px;">Archief</h2>
+          <p class="hint" style="margin-top:6px;">Wordt lokaal opgeslagen (browser). CSV export beschikbaar.</p>
+        </div>
+        <div class="actions" style="margin-top:0;">
+          <button id="clearArchiveBtn" type="button" class="danger">Archief wissen</button>
         </div>
       </div>
 
-      <div class="actions">
-        <button id="clearBtn" type="button">Leegmaken</button>
-        <button id="exportBtn" type="button">Export CSV</button>
-      </div>
-    </section>
-
-    <section class="card">
-      <div class="card-head">
-        <h2>Substitutie</h2>
-        <p class="hint">Elke lijn: <code>EXPECTED,SUBSTITUTE</code> (eerste 9 tekens tellen).</p>
-      </div>
-      <textarea id="substitutionInput" rows="6" spellcheck="false"></textarea>
-      <div class="actions">
-        <button id="saveSubBtn" type="button">Substitutie opslaan</button>
-        <button id="resetSubBtn" type="button">Reset voorbeeld</button>
-      </div>
-    </section>
-
-    <section class="card">
-      <div class="card-head">
-        <h2>Archief</h2>
-        <p class="hint">Wordt lokaal opgeslagen in je browser (localStorage).</p>
-      </div>
-
       <div class="table-wrap">
-        <table id="archiveTable">
+        <table>
           <thead>
             <tr>
               <th>Datum/tijd</th>
@@ -74,16 +166,432 @@
               <th>Status</th>
             </tr>
           </thead>
-          <tbody></tbody>
+          <tbody id="archiveBody"></tbody>
         </table>
-      </div>
-
-      <div class="actions">
-        <button id="clearArchiveBtn" type="button" class="danger">Archief wissen</button>
       </div>
     </section>
   </main>
 
-  <script src="app.js"></script>
+  <script>
+    "use strict";
+
+    // Excel: Private Const N As Long = 9
+    const N = 9;
+
+    const els = {
+      userInput: document.getElementById("userInput"),
+      code1: document.getElementById("code1"),
+      code2: document.getElementById("code2"),
+      statusCell: document.getElementById("statusCell"),
+      substitutionInput: document.getElementById("substitutionInput"),
+      saveSubBtn: document.getElementById("saveSubBtn"),
+      resetSubBtn: document.getElementById("resetSubBtn"),
+      clearBtn: document.getElementById("clearBtn"),
+      exportBtn: document.getElementById("exportBtn"),
+      clearArchiveBtn: document.getElementById("clearArchiveBtn"),
+      archiveBody: document.getElementById("archiveBody"),
+      overlay: document.getElementById("overlay"),
+      countdown: document.getElementById("countdown"),
+    };
+
+    const STORAGE_KEYS = {
+      user: "bm_user",
+      substitution: "bm_substitution",
+      archive: "bm_archive",
+    };
+
+    let lockTimer = null;        // voor 5s "Excel Wait"
+    let lockCountdownTimer = null;
+
+    // ======= VBA: ExtractUserLetters =======
+    function extractUserLetters(raw) {
+      const s = String(raw ?? "").trim();
+      if (!s) return "";
+      const token = s.split(" ")[0];  // deel vóór eerste spatie
+      let out = "";
+      for (const ch of token) {
+        if (/[A-Za-z]/.test(ch)) out += ch;
+      }
+      return out.toUpperCase();
+    }
+
+    // ======= VBA: GetCodePrefix =======
+    function getCodePrefix(value) {
+      const raw = String(value ?? "").trim();
+      return raw.slice(0, N).toUpperCase();
+    }
+
+    // ======= Substitutie parsing (worksheet "Substitutie") =======
+    function parseSubstitution(text) {
+      const lines = String(text ?? "")
+        .split(/\r?\n/)
+        .map(l => l.trim())
+        .filter(l => l && !l.startsWith("#"));
+
+      const pairs = [];
+      for (const line of lines) {
+        const parts = line.split(",").map(p => p.trim());
+        if (parts.length < 2) continue;
+        const exp = getCodePrefix(parts[0]);
+        const sub = getCodePrefix(parts[1]);
+        if (exp && sub) pairs.push([exp, sub]);
+      }
+      return pairs;
+    }
+
+    // ======= VBA: IsAllowedCombination =======
+    function isAllowedCombination(p1, p2, substitutionPairs) {
+      // directe match
+      if (p1 && p2 && p1.toUpperCase() === p2.toUpperCase()) return true;
+
+      // substitutie in beide richtingen
+      for (const [exp, sub] of substitutionPairs) {
+        if ((p1 === exp && p2 === sub) || (p2 === exp && p1 === sub)) return true;
+      }
+      return false;
+    }
+
+    // ======= VBA: PaintStatusCell =======
+    function setStatus(status) {
+      const s = String(status ?? "").trim().toLowerCase();
+      els.statusCell.classList.remove("status-incomplete", "status-match", "status-nomatch");
+
+      if (s === "match") {
+        els.statusCell.classList.add("status-match");
+        els.statusCell.textContent = "Match";
+      } else if (s === "no match" || s === "geen match") {
+        els.statusCell.classList.add("status-nomatch");
+        els.statusCell.textContent = "No match";
+      } else {
+        els.statusCell.classList.add("status-incomplete");
+        els.statusCell.textContent = "incomplete";
+      }
+    }
+
+    function resetToIncomplete() {
+      setStatus("incomplete");
+    }
+
+    // ======= Archief (worksheet "Archief") via localStorage =======
+    function loadArchive() {
+      try {
+        const raw = localStorage.getItem(STORAGE_KEYS.archive);
+        const arr = raw ? JSON.parse(raw) : [];
+        return Array.isArray(arr) ? arr : [];
+      } catch {
+        return [];
+      }
+    }
+
+    function saveArchive(items) {
+      localStorage.setItem(STORAGE_KEYS.archive, JSON.stringify(items));
+    }
+
+    function addArchiveRow(row) {
+      const archive = loadArchive();
+      archive.push(row); // Excel schrijft onderaan: +1 row
+      saveArchive(archive);
+      renderArchive();
+    }
+
+    function renderArchive() {
+      const archive = loadArchive();
+      els.archiveBody.innerHTML = "";
+      for (const item of archive) {
+        const tr = document.createElement("tr");
+        const cols = [
+          item.datetime,
+          item.user,
+          item.full1,
+          item.full2,
+          item.prefix1,
+          item.prefix2,
+          item.status,
+        ];
+        for (const c of cols) {
+          const td = document.createElement("td");
+          td.textContent = c;
+          tr.appendChild(td);
+        }
+        els.archiveBody.appendChild(tr);
+      }
+    }
+
+    // ======= CSV export =======
+    function downloadText(filename, text) {
+      const blob = new Blob([text], { type: "text/plain;charset=utf-8" });
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(a.href);
+    }
+
+    function exportArchiveCsv() {
+      const archive = loadArchive();
+      const header = [
+        "Datum/tijd", "Gebruiker",
+        "Barcode 1 (volledig)", "Barcode 2 (volledig)",
+        `Eerste ${N} (A2)`, `Eerste ${N} (B2)`,
+        "Status"
+      ];
+
+      const esc = (v) => {
+        const s = String(v ?? "");
+        if (/[",\n\r]/.test(s)) return `"${s.replace(/"/g, '""')}"`;
+        return s;
+      };
+
+      const lines = [header.map(esc).join(",")];
+      for (const item of archive) {
+        lines.push([
+          item.datetime, item.user, item.full1, item.full2,
+          item.prefix1, item.prefix2, item.status
+        ].map(esc).join(","));
+      }
+
+      const ts = new Date().toISOString().slice(0,19).replace(/[:T]/g,"-");
+      downloadText(`archief-${ts}.csv`, lines.join("\n"));
+    }
+
+    // ======= "Excel Wait" blokkering bij Match =======
+    function setInputsLocked(locked) {
+      els.code1.disabled = locked;
+      els.code2.disabled = locked;
+      els.userInput.disabled = locked; // Excel blokkeert alles tijdens Wait
+      els.substitutionInput.disabled = locked;
+      els.saveSubBtn.disabled = locked;
+      els.resetSubBtn.disabled = locked;
+      els.clearBtn.disabled = locked;
+      els.exportBtn.disabled = locked;
+      els.clearArchiveBtn.disabled = locked;
+
+      els.overlay.style.display = locked ? "flex" : "none";
+    }
+
+    function startMatchLock(seconds = 5) {
+      // stop eventuele bestaande timers
+      if (lockTimer) clearTimeout(lockTimer);
+      if (lockCountdownTimer) clearInterval(lockCountdownTimer);
+
+      setInputsLocked(true);
+
+      let remaining = seconds;
+      els.countdown.textContent = String(remaining);
+
+      lockCountdownTimer = setInterval(() => {
+        remaining -= 1;
+        els.countdown.textContent = String(Math.max(0, remaining));
+      }, 1000);
+
+      lockTimer = setTimeout(() => {
+        clearInterval(lockCountdownTimer);
+        lockCountdownTimer = null;
+        lockTimer = null;
+
+        // Excel: clear A2:B2, status back to incomplete, focus A2
+        els.code1.value = "";
+        els.code2.value = "";
+        resetToIncomplete();
+
+        setInputsLocked(false);
+        els.code1.focus();
+      }, seconds * 1000);
+    }
+
+    // ======= Gebruiker normaliseren (B4) =======
+    function normalizeUser() {
+      const raw = els.userInput.value;
+      const cleaned = extractUserLetters(raw);
+      if (raw !== cleaned) els.userInput.value = cleaned;
+      localStorage.setItem(STORAGE_KEYS.user, cleaned);
+    }
+
+    // ======= Core "Worksheet_Change" equivalent =======
+    function requireUserOrStop() {
+      const userName = String(els.userInput.value ?? "").trim();
+      if (!userName) {
+        alert("Gelieve eerst uw gebruikersbarcode te scannen.");
+        els.userInput.focus();
+        return false;
+      }
+      return true;
+    }
+
+    function evaluateIfReady(cameFrom) {
+      // Excel: reset status to incomplete at start of check
+      resetToIncomplete();
+
+      if (!requireUserOrStop()) return;
+
+      const full1 = String(els.code1.value ?? "").trim();
+      const full2 = String(els.code2.value ?? "").trim();
+
+      // Excel: nog niet genoeg tekens -> stoppen; focus gedrag zoals VBA
+      if (full1.length < N || full2.length < N) {
+        if (cameFrom === "A2" && full1.length >= N) els.code2.focus();
+        return;
+      }
+
+      const prefix1 = getCodePrefix(full1);
+      const prefix2 = getCodePrefix(full2);
+
+      const pairs = parseSubstitution(els.substitutionInput.value);
+
+      let status = "No match";
+      let isMatch = false;
+
+      if (isAllowedCombination(prefix1, prefix2, pairs)) {
+        status = "Match";
+        isMatch = true;
+      }
+
+      setStatus(status);
+
+      // Excel: LogToArchive(..., userName)
+      const dt = new Date();
+      const datetime = dt.toLocaleString("nl-BE", {
+        year: "numeric", month: "2-digit", day: "2-digit",
+        hour: "2-digit", minute: "2-digit", second: "2-digit",
+      });
+
+      const userName = String(els.userInput.value ?? "").trim();
+
+      addArchiveRow({
+        datetime,
+        user: userName,
+        full1,
+        full2,
+        prefix1,
+        prefix2,
+        status,
+      });
+
+      // Excel: bij Match -> Wait 5 sec (blokkeer) -> clear & reset
+      if (isMatch) {
+        startMatchLock(5);
+      } else {
+        if (cameFrom === "A2") els.code2.focus();
+      }
+    }
+
+    // ======= Substitutie opslag =======
+    function persistSubstitution() {
+      localStorage.setItem(STORAGE_KEYS.substitution, els.substitutionInput.value);
+    }
+
+    function setExampleSubstitution() {
+      els.substitutionInput.value = [
+        "# Voorbeeld:",
+        "# EXPECTED,SUBSTITUTE",
+        "ABCDEF123,XYZ987654",
+        "111111111,222222222"
+      ].join("\n");
+      persistSubstitution();
+    }
+
+    // ======= Event wiring (scan-friendly) =======
+    function onScanEnterNormalize(e) {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        normalizeUser();
+        els.code1.focus(); // workflow zoals Excel (na user scan start bij A2)
+      }
+    }
+
+    function onScanEnterEvaluate(e, which) {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        // als A2 net klaar is: naar B2, maar als B2 al klaar is: evaluate
+        if (which === "A2") {
+          const full1 = String(els.code1.value ?? "").trim();
+          if (full1.length >= N) els.code2.focus();
+          evaluateIfReady("A2");
+        } else {
+          evaluateIfReady("B2");
+        }
+      }
+    }
+
+    // Gebruiker: normalize op blur/change + Enter
+    els.userInput.addEventListener("change", normalizeUser);
+    els.userInput.addEventListener("blur", normalizeUser);
+    els.userInput.addEventListener("keydown", onScanEnterNormalize);
+
+    // A2/B2: reset status op input, focus-switch, evaluate bij voldoende lengte
+    els.code1.addEventListener("input", () => {
+      // als match-lock actief is, negeer (zou disabled moeten zijn)
+      resetToIncomplete();
+
+      const full1 = String(els.code1.value ?? "").trim();
+      if (full1.length >= N) {
+        // Excel: als van A2 komt -> select B2
+        els.code2.focus();
+      }
+
+      // Als B2 al gevuld is, kan dit meteen evalueren
+      evaluateIfReady("A2");
+    });
+
+    els.code2.addEventListener("input", () => {
+      resetToIncomplete();
+      evaluateIfReady("B2");
+    });
+
+    // Enter support (veel scanners sturen Enter)
+    els.code1.addEventListener("keydown", (e) => onScanEnterEvaluate(e, "A2"));
+    els.code2.addEventListener("keydown", (e) => onScanEnterEvaluate(e, "B2"));
+
+    // Buttons
+    els.clearBtn.addEventListener("click", () => {
+      // stop lock timers indien actief
+      if (lockTimer) clearTimeout(lockTimer);
+      if (lockCountdownTimer) clearInterval(lockCountdownTimer);
+      lockTimer = null; lockCountdownTimer = null;
+
+      setInputsLocked(false);
+      els.code1.value = "";
+      els.code2.value = "";
+      resetToIncomplete();
+      els.code1.focus();
+    });
+
+    els.saveSubBtn.addEventListener("click", () => {
+      persistSubstitution();
+      alert("Substitutie opgeslagen.");
+    });
+
+    els.resetSubBtn.addEventListener("click", () => {
+      setExampleSubstitution();
+      alert("Substitutie reset naar voorbeeld.");
+    });
+
+    els.exportBtn.addEventListener("click", exportArchiveCsv);
+
+    els.clearArchiveBtn.addEventListener("click", () => {
+      if (!confirm("Archief zeker wissen?")) return;
+      saveArchive([]);
+      renderArchive();
+    });
+
+    // Init
+    window.addEventListener("load", () => {
+      const savedUser = localStorage.getItem(STORAGE_KEYS.user);
+      if (savedUser) els.userInput.value = savedUser;
+
+      const savedSub = localStorage.getItem(STORAGE_KEYS.substitution);
+      if (savedSub) els.substitutionInput.value = savedSub;
+      else setExampleSubstitution();
+
+      renderArchive();
+      resetToIncomplete();
+
+      // focus zoals workflow
+      if (!String(els.userInput.value ?? "").trim()) els.userInput.focus();
+      else els.code1.focus();
+    });
+  </script>
 </body>
 </html>
